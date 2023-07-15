@@ -179,5 +179,24 @@ describe("remark-wiki-link", () => {
         assert.equal(node.data.hProperties.className, "wiki_link")
       })
     });
+
+    it("parses embed wiki links (img)", () => {
+      let processor = unified()
+          .use(markdown)
+          .use(wikiLinkPlugin, {
+            permalinks: ['wiki_link']
+          });
+
+      var ast = processor.parse('![[Wiki Link]]');
+      ast = processor.runSync(ast);
+
+      visit(ast, 'wikiLink', (node) => {
+        assert.equal(node.data.exists, true)
+        assert.equal(node.data.permalink, 'wiki_link')
+        assert.equal(node.data.hName, 'img')
+        assert.equal(node.data.hProperties.className, 'internal')
+        assert.equal(node.data.hProperties.src, '#/page/wiki_link')
+      })
+    });
   });
 });

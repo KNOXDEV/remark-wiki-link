@@ -1,9 +1,56 @@
 import map from 'unist-util-map';
 
-const LINK_REGEX = /^\[\[(.+?)\]\]/;
+const LINK_REGEX = /^!?\[\[(.+?)\]\]/;
 
 function locator (value, fromIndex) {
-  return value.indexOf('[', fromIndex)
+  const linkStart = value.indexOf('[', fromIndex);
+  const embedStart = value.indexOf('!', fromIndex);
+  return Math.min(linkStart, embedStart)
+}
+
+// pure function that takes in the fully formed wikiLink node and returns
+// a new embed-ified node. Should only be called if an actual embed form is detected.
+function toEmbedNode(pageName, wikiLinkNode) {
+  let filetype = pageName.slice(pageName.lastIndexOf('.') + 1);
+
+  let newData = {};
+
+  switch (filetype) {
+    case "mov":
+    case "mp4":
+    case "webm":
+      newData = {
+        hName: 'video',
+        hProperties: {
+          className: wikiLinkNode.data.hProperties.className,
+          src: wikiLinkNode.data.hProperties.href,
+        },
+        hChildren: undefined
+      }
+      break;
+    case "png":
+    case "jpg":
+    case "jpeg":
+    case "gif":
+    default:
+      newData = {
+        hName: 'img',
+        hProperties: {
+          className: wikiLinkNode.data.hProperties.className,
+          src: wikiLinkNode.data.hProperties.href,
+          alt: wikiLinkNode.data.alias
+        },
+        hChildren: undefined
+      }
+  }
+
+  return {
+    ...wikiLinkNode,
+    data: {
+      ...wikiLinkNode.data,
+      ...newData
+    }
+  };
 }
 
 function wikiLinkPlugin(opts = {}) {
@@ -55,7 +102,7 @@ function wikiLinkPlugin(opts = {}) {
         classNames += ' ' + newClassName;
       }
 
-      return eat(match[0])({
+      let linkData = {
         type: 'wikiLink',
         value: name,
         data: {
@@ -72,7 +119,14 @@ function wikiLinkPlugin(opts = {}) {
             value: displayName
           }]
         },
-      });
+      };
+
+      // if this was an embed wiki link, we need to do some more processing
+      if(match[0].startsWith("!")) {
+        linkData = toEmbedNode(pageName, linkData);
+      }
+
+      return eat(match[0])(linkData);
     }
   }
 
